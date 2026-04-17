@@ -1,158 +1,144 @@
 'use strict';
 
-/**
- * Phase 4: 综合呈现
- * 
- * 收集所有专家的 findings，按主题重组（而非按角色），
- * 交叉验证数字一致性，生成结论式标题，输出最终报告。
- * 
- * @param {{ expertResults: Array }} analysisResults
- * @param {object} cleanData
- * @returns {{ report: object }}
- */
+const { getPlatformTerms } = require('./terms');
+
 function synthesize(analysisResults, cleanData) {
-  const { expertResults } = analysisResults;
+  const terms = {
+    ...getPlatformTerms(cleanData.platform),
+    ...(cleanData.meta || {}),
+  };
+  const expertResults = Array.isArray(analysisResults.expertResults)
+    ? analysisResults.expertResults
+    : [];
   const { dailyMerged, articles, channelTotals, summary } = cleanData;
 
-  // ── 1. 按主题重组发现 ──
   const sections = {
     overview: {
-      title: '',  // 结论式标题，下面生成
-      kpis: buildKPIs(summary, dailyMerged),
+      title: generateOverviewTitle(summary, terms),
+      kpis: buildKPIs(summary, dailyMerged, terms),
     },
     content: {
-      title: '',
+      title: generateContentTitle(articles, terms),
       findings: [],
       details: '',
     },
     growth: {
-      title: '',
+      title: generateGrowthTitle(summary, terms),
       findings: [],
       details: '',
     },
     distribution: {
-      title: '',
+      title: generateDistributionTitle(channelTotals, terms),
       findings: [],
       details: '',
     },
     risksAndOpportunities: {
-      title: '⚠️ 风险与机会',
+      title: '风险与建议',
       risks: [],
       opportunities: [],
     },
   };
 
-  // 按专家角色分拣 findings
   for (const result of expertResults) {
-    const role = result.role;
-
-    if (role.includes('增长')) {
-      sections.growth.findings.push(...result.findings);
-      sections.growth.details = result.details;
-    } else if (role.includes('内容') || role.includes('策略')) {
-      sections.content.findings.push(...result.findings);
-      sections.content.details = result.details;
-    } else if (role.includes('传播') || role.includes('分布')) {
-      sections.distribution.findings.push(...result.findings);
-      sections.distribution.details = result.details;
+    if (isGrowthRole(result.role)) {
+      sections.growth.findings.push(...(result.findings || []));
+      sections.growth.details = result.details || '';
+    } else if (isContentRole(result.role)) {
+      sections.content.findings.push(...(result.findings || []));
+      sections.content.details = result.details || '';
+    } else if (isDistributionRole(result.role)) {
+      sections.distribution.findings.push(...(result.findings || []));
+      sections.distribution.details = result.details || '';
+    } else {
+      sections.distribution.findings.push(...(result.findings || []));
+      if (!sections.distribution.details) {
+        sections.distribution.details = result.details || '';
+      }
     }
 
-    // 风险汇总
     sections.risksAndOpportunities.risks.push(
-      ...result.risks.map(r => ({ source: role, text: r }))
+      ...(result.risks || []).map((risk) => ({ source: result.role, text: risk }))
     );
   }
 
-  // ── 2. 生成结论式标题 ──
-  sections.overview.title = generateOverviewTitle(summary);
-  sections.content.title = generateContentTitle(articles, summary);
-  sections.growth.title = generateGrowthTitle(summary);
-  sections.distribution.title = generateDistributionTitle(channelTotals);
-
-  // ── 3. 交叉验证 ──
-  const crossCheck = crossValidate(expertResults);
-
-  // ── 4. 文章排名表 ──
   const articleTable = [...articles]
-    .sort((a, b) => b.readers - a.readers)
-    .map((a, i) => ({
-      rank: i + 1,
-      title: a.title,
-      pubDate: a.pubDate,
-      readers: a.readers,
-      readRatio: (a.readRatio * 100).toFixed(1) + '%',
+    .sort((left, right) => right.readers - left.readers)
+    .map((article, index) => ({
+      rank: index + 1,
+      title: article.title,
+      pubDate: article.pubDate,
+      readers: article.readers,
+      readRatio: article.readRatio == null ? '—' : `${(article.readRatio * 100).toFixed(1)}%`,
+      extra: article.extra || {},
     }));
 
-  // ── 5. 图表数据 ──
-  const charts = buildChartData(dailyMerged, channelTotals, articles);
-
-  // ── 6. 最终报告结构 ──
   const report = {
     generatedAt: new Date().toISOString(),
+    platform: cleanData.platform,
+    meta: {
+      ...terms,
+      hasChannelBreakdown: Object.keys(channelTotals).length > 0,
+    },
     dateRange: summary.dateRange,
     sections,
     articleTable,
-    charts,
-    crossCheck,
+    charts: buildChartData(dailyMerged, channelTotals, articles, terms),
+    crossCheck: crossValidate(expertResults, terms),
     rawExpertResults: expertResults,
   };
 
-  console.log(`[synthesize] 报告已生成: ${articleTable.length} 篇文章, ${crossCheck.length} 条交叉验证`);
-
+  console.log(`[synthesize] 报告已生成: ${articleTable.length} 条${terms.contentLabel}数据`);
   return { report };
 }
 
-/**
- * 构建 KPI 卡片数据
- */
-function buildKPIs(summary, dailyMerged) {
-  // 计算周环比（后15天 vs 前15天）
-  const mid = Math.floor(dailyMerged.length / 2);
-  const firstHalf = dailyMerged.slice(0, mid);
-  const secondHalf = dailyMerged.slice(mid);
-
-  const firstReaders = firstHalf.reduce((s, d) => s + d.readers, 0);
-  const secondReaders = secondHalf.reduce((s, d) => s + d.readers, 0);
+function buildKPIs(summary, dailyMerged, terms) {
+  const middle = Math.floor(dailyMerged.length / 2);
+  const firstHalf = dailyMerged.slice(0, middle);
+  const secondHalf = dailyMerged.slice(middle);
+  const firstReaders = sumBy(firstHalf, 'readers');
+  const secondReaders = sumBy(secondHalf, 'readers');
   const readersTrend = firstReaders > 0
     ? ((secondReaders - firstReaders) / firstReaders * 100).toFixed(1)
-    : '0';
+    : '0.0';
 
   return [
     {
-      label: '粉丝净增',
+      label: `${terms.audienceLabel}净增`,
       value: summary.netGrowth,
-      sub: `${summary.startFollowers} → ${summary.endFollowers}`,
+      sub: summary.startFollowers != null && summary.endFollowers != null
+        ? `${summary.startFollowers} -> ${summary.endFollowers}`
+        : '当前仅基于净涨粉趋势汇总',
       trend: summary.netGrowth > 0 ? 'up' : summary.netGrowth < 0 ? 'down' : 'flat',
     },
     {
-      label: '总阅读',
+      label: `总${terms.readerLabel}`,
       value: summary.totalReaders,
       sub: `日均 ${summary.avgDailyReaders}`,
-      trend: parseFloat(readersTrend) > 0 ? 'up' : 'down',
-      trendValue: readersTrend + '%',
+      trendValue: `${readersTrend}%`,
+      trend: Number(readersTrend) >= 0 ? 'up' : 'down',
     },
     {
       label: '总分享',
       value: summary.totalShares,
-      sub: `平均转发率 ${(summary.avgShareRate * 100).toFixed(2)}%`,
+      sub: `平均分享率 ${(summary.avgShareRate * 100).toFixed(2)}%`,
       trend: summary.avgShareRate > 0.02 ? 'up' : 'down',
     },
     {
       label: '总收藏',
       value: summary.totalFavorites,
-      sub: `${summary.totalArticles} 篇文章`,
+      sub: `${summary.totalArticles} 条${terms.contentLabel}`,
       trend: 'neutral',
     },
     {
-      label: '发文篇数',
+      label: `${terms.contentLabel}数`,
       value: summary.totalArticles,
-      sub: `${summary.totalPublishDays} 天发文`,
+      sub: `${summary.totalPublishDays} 天发布`,
       trend: 'neutral',
     },
     {
-      label: '粉丝流失率',
+      label: `${terms.audienceLabel}流失率`,
       value: summary.totalNewUsers > 0
-        ? ((summary.totalCancelUsers / summary.totalNewUsers) * 100).toFixed(1) + '%'
+        ? `${((summary.totalCancelUsers / summary.totalNewUsers) * 100).toFixed(1)}%`
         : '0%',
       sub: `新增 ${summary.totalNewUsers} / 取关 ${summary.totalCancelUsers}`,
       trend: summary.totalCancelUsers / Math.max(summary.totalNewUsers, 1) > 0.3 ? 'warning' : 'ok',
@@ -160,139 +146,127 @@ function buildKPIs(summary, dailyMerged) {
   ];
 }
 
-/**
- * 生成结论式标题（不是描述式）
- */
-function generateOverviewTitle(summary) {
+function generateOverviewTitle(summary, terms) {
+  if (summary.startFollowers == null || summary.endFollowers == null) {
+    if (summary.netGrowth > 0) return `${terms.platformName}${terms.audienceLabel}处于增长状态，近 30 天净增 ${summary.netGrowth}`;
+    if (summary.netGrowth < 0) return `${terms.platformName}${terms.audienceLabel}出现流失，近 30 天净减 ${Math.abs(summary.netGrowth)}`;
+    return `${terms.platformName}${terms.audienceLabel}整体平稳，近 30 天净增接近 0`;
+  }
+
   const growthRate = ((summary.netGrowth / Math.max(summary.startFollowers, 1)) * 100).toFixed(1);
-  if (parseFloat(growthRate) > 10) return `🚀 强势增长期: 30天粉丝增长 ${growthRate}%`;
-  if (parseFloat(growthRate) > 3) return `📈 稳健增长: 30天净增 ${summary.netGrowth} 粉丝`;
-  if (parseFloat(growthRate) > 0) return `📊 缓慢增长: 30天净增 ${summary.netGrowth} 人，增速待提升`;
-  if (parseFloat(growthRate) === 0) return `⏸️ 增长停滞: 30天粉丝零增长`;
-  return `📉 粉丝流失: 30天净减 ${Math.abs(summary.netGrowth)} 人`;
+  if (Number(growthRate) > 10) return `${terms.platformName}${terms.audienceLabel}增长强劲，近 30 天增长 ${growthRate}%`;
+  if (Number(growthRate) > 3) return `${terms.platformName}${terms.audienceLabel}稳步增长，近 30 天净增 ${summary.netGrowth}`;
+  if (Number(growthRate) > 0) return `${terms.platformName}${terms.audienceLabel}缓慢增长，当前仍有提速空间`;
+  if (Number(growthRate) === 0) return `${terms.platformName}${terms.audienceLabel}增长停滞，近 30 天净增为 0`;
+  return `${terms.platformName}${terms.audienceLabel}出现流失，近 30 天净减 ${Math.abs(summary.netGrowth)}`;
 }
 
-function generateContentTitle(articles, summary) {
-  if (articles.length === 0) return '📝 期间无发文';
-  const topReaders = articles.length > 0
-    ? Math.max(...articles.map(a => a.readers))
-    : 0;
-  const avgReaders = articles.length > 0
-    ? Math.round(articles.reduce((s, a) => s + a.readers, 0) / articles.length)
-    : 0;
-  return `📝 ${articles.length} 篇文章: 篇均阅读 ${avgReaders}，最高 ${topReaders}`;
+function generateContentTitle(articles, terms) {
+  if (articles.length === 0) return `本期暂无${terms.contentLabel}`;
+  const topReaders = Math.max(...articles.map((article) => article.readers));
+  const avgReaders = Math.round(sumBy(articles, 'readers') / articles.length);
+  return `${articles.length} 条${terms.contentLabel}，平均${terms.readerLabel} ${avgReaders}，最高 ${topReaders}`;
 }
 
-function generateGrowthTitle(summary) {
-  if (summary.netGrowth <= 0) return '👥 增长承压: 关注增速放缓';
-  return `👥 30天净增 ${summary.netGrowth} 粉丝（新增 ${summary.totalNewUsers} / 取关 ${summary.totalCancelUsers}）`;
+function generateGrowthTitle(summary, terms) {
+  if (summary.netGrowth <= 0) return `${terms.audienceLabel}增长承压，新增转化仍需优化`;
+  return `近 30 天净增 ${summary.netGrowth} ${terms.audienceLabel}（新增 ${summary.totalNewUsers} / 取关 ${summary.totalCancelUsers}）`;
 }
 
-function generateDistributionTitle(channelTotals) {
-  const sorted = Object.entries(channelTotals).sort((a, b) => b[1] - a[1]);
-  const topChannel = sorted[0] ? sorted[0][0] : '未知';
-  return `📡 主要流量来源: ${topChannel}`;
+function generateDistributionTitle(channelTotals, terms) {
+  const entries = Object.entries(channelTotals).sort((left, right) => right[1] - left[1]);
+  if (entries.length === 0) {
+    return `当前缺少${terms.channelLabel}拆分，重点观察分享与收藏带来的二次传播`;
+  }
+  return `主要${terms.channelLabel}: ${entries[0][0]}`;
 }
 
-/**
- * 交叉验证不同专家的数据
- */
-function crossValidate(expertResults) {
+function crossValidate(expertResults, terms) {
   const checks = [];
+  const growth = expertResults.find((result) => isGrowthRole(result.role));
+  const content = expertResults.find((result) => isContentRole(result.role));
+  const distribution = expertResults.find((result) => isDistributionRole(result.role));
 
-  // 收集所有 findings 中提到的数字
-  const allFindings = expertResults.flatMap(r =>
-    r.findings.map(f => ({ source: r.role, text: f }))
-  );
-
-  // 简单交叉：标记来自不同专家但涉及相同指标的发现
-  const growthFindings = allFindings.filter(f => f.source.includes('增长'));
-  const contentFindings = allFindings.filter(f => f.source.includes('内容') || f.source.includes('策略'));
-  const distFindings = allFindings.filter(f => f.source.includes('传播') || f.source.includes('分布'));
-
-  if (growthFindings.length > 0 && contentFindings.length > 0) {
+  if (growth && content) {
     checks.push({
       type: 'cross-reference',
-      note: '增长分析师与内容策略师的发现可交叉印证：粉丝增长高峰是否对应优质内容发布？',
+      note: `验证${terms.audienceLabel}增长高峰是否与高表现${terms.contentLabel}发布时间一致。`,
     });
   }
 
-  if (contentFindings.length > 0 && distFindings.length > 0) {
+  if (content && distribution) {
     checks.push({
       type: 'cross-reference',
-      note: '内容策略师与传播分析师的发现可交叉印证：高阅读文章是否在特定渠道获得更多传播？',
+      note: `验证高表现${terms.contentLabel}是否同时带来更强的分享、收藏与二次分发。`,
     });
   }
 
   return checks;
 }
 
-/**
- * 构建图表数据
- */
-function buildChartData(dailyMerged, channelTotals, articles) {
+function buildChartData(dailyMerged, channelTotals, articles, terms) {
   return {
-    // 折线图：每日阅读与粉丝趋势
     readerTrend: {
       type: 'line',
-      title: '每日阅读量与粉丝趋势',
-      labels: dailyMerged.map(d => d.date),
+      title: `每日${terms.readerLabel}与${terms.audienceLabel}趋势`,
+      labels: dailyMerged.map((day) => day.date),
       datasets: [
-        {
-          label: '阅读人数',
-          data: dailyMerged.map(d => d.readers),
-          yAxisID: 'y1',
-        },
-        {
-          label: '累积粉丝',
-          data: dailyMerged.map(d => d.totalUser),
-          yAxisID: 'y2',
-        },
+        { label: terms.readerLabel, data: dailyMerged.map((day) => day.readers), yAxisID: 'y1' },
+        { label: `累计${terms.audienceLabel}`, data: dailyMerged.map((day) => day.totalUser), yAxisID: 'y2' },
       ],
     },
-
-    // 柱状图：每日新增与取关
     userFlow: {
       type: 'bar',
-      title: '每日新增关注 vs 取消关注',
-      labels: dailyMerged.map(d => d.date),
+      title: `每日新增${terms.audienceLabel} vs 取关`,
+      labels: dailyMerged.map((day) => day.date),
       datasets: [
-        { label: '新关注', data: dailyMerged.map(d => d.newUser) },
-        { label: '取消关注', data: dailyMerged.map(d => -d.cancelUser) },
+        { label: `新增${terms.audienceLabel}`, data: dailyMerged.map((day) => day.newUser) },
+        { label: '取关', data: dailyMerged.map((day) => -day.cancelUser) },
       ],
     },
-
-    // 饼图：渠道分布
     channelPie: {
       type: 'pie',
-      title: '阅读来源渠道分布',
+      title: `${terms.channelLabel}分布`,
       labels: Object.keys(channelTotals),
       data: Object.values(channelTotals),
     },
-
-    // 柱状图：文章阅读量排名
     articleBar: {
       type: 'bar',
-      title: '文章阅读量排名',
+      title: `${terms.contentLabel}表现排名`,
       labels: [...articles]
-        .sort((a, b) => b.readers - a.readers)
-        .map(a => a.title.length > 20 ? a.title.substring(0, 20) + '...' : a.title),
+        .sort((left, right) => right.readers - left.readers)
+        .map((article) => article.title.length > 20 ? `${article.title.slice(0, 20)}...` : article.title),
       data: [...articles]
-        .sort((a, b) => b.readers - a.readers)
-        .map(a => a.readers),
+        .sort((left, right) => right.readers - left.readers)
+        .map((article) => article.readers),
     },
-
-    // 折线图：每日互动
     interactionTrend: {
       type: 'line',
       title: '每日分享与收藏',
-      labels: dailyMerged.map(d => d.date),
+      labels: dailyMerged.map((day) => day.date),
       datasets: [
-        { label: '分享', data: dailyMerged.map(d => d.shares) },
-        { label: '收藏', data: dailyMerged.map(d => d.favorites) },
+        { label: '分享', data: dailyMerged.map((day) => day.shares) },
+        { label: '收藏', data: dailyMerged.map((day) => day.favorites) },
       ],
     },
   };
+}
+
+function sumBy(rows, key) {
+  return rows.reduce((sum, row) => sum + Number(row[key] || 0), 0);
+}
+
+function isGrowthRole(role) {
+  return String(role || '').includes('增长');
+}
+
+function isContentRole(role) {
+  return String(role || '').includes('内容');
+}
+
+function isDistributionRole(role) {
+  const value = String(role || '');
+  return value.includes('分发') || value.includes('传播');
 }
 
 module.exports = { synthesize };
