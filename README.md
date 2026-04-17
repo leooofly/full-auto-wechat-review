@@ -39,6 +39,12 @@ node scripts/run.js --analyze-only
 运行解析链路测试：
 
 ```bash
+npm test
+```
+
+或：
+
+```bash
 node scripts/test-parser.js
 ```
 
@@ -53,3 +59,4 @@ node scripts/test-parser.js
 - `node_modules/` 已排除，不建议提交
 - `reports/*.html` 和 `reports/*.json` 为分析产物，不建议公开提交
 - `scripts/test-parser.js` 会自动读取本机最新缓存数据，不再依赖固定文件名
+- `scripts/generate_final.js` 会默认读取 `~/.wechat-review/reports/` 下最新的 `cleanData_*.json`

@@ -2,13 +2,37 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { synthesize } = require('../analysis/synthesize.js');
 
-// Load clean data
-const cleanData = JSON.parse(fs.readFileSync(
-  path.resolve(process.env.USERPROFILE || process.env.HOME, '.wechat-review/reports/cleanData_2026-04-16T02-19-38.json'),
-  'utf8'
-));
+const HOME_DIR = os.homedir();
+const REPORTS_DIR = path.join(HOME_DIR, '.wechat-review', 'reports');
+
+function getLatestReportFile(prefix) {
+  if (!fs.existsSync(REPORTS_DIR)) {
+    return null;
+  }
+
+  const candidates = fs.readdirSync(REPORTS_DIR)
+    .filter(name => name.startsWith(prefix) && name.endsWith('.json'))
+    .sort()
+    .reverse();
+
+  return candidates.length > 0 ? path.join(REPORTS_DIR, candidates[0]) : null;
+}
+
+function loadJson(filePath, label) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`${label} 不存在: ${filePath || '未提供路径'}`);
+  }
+
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+const cleanDataFile = process.argv[2]
+  || process.env.CLEAN_DATA_FILE
+  || getLatestReportFile('cleanData_');
+const cleanData = loadJson(cleanDataFile, 'cleanData 文件');
 
 // Expert results - real analysis
 const expertResults = [
@@ -89,8 +113,7 @@ if (html.includes('/*__REPORT_JSON__*/null')) {
 }
 
 // Save to both locations
-const homeDir = process.env.USERPROFILE || process.env.HOME;
-const dir1 = path.join(homeDir, '.wechat-review/reports');
+const dir1 = REPORTS_DIR;
 const dir2 = path.resolve(__dirname, '../reports');
 
 fs.mkdirSync(dir1, { recursive: true });

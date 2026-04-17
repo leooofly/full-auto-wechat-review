@@ -4,6 +4,7 @@
   "description": "公众号数据分析 Cola Skill — 抓取、解析、多专家分析",
   "main": "scripts/run.js",
   "scripts": {
+    "test": "node scripts/test-parser.js",
     "start": "node scripts/run.js",
     "scrape": "node scripts/run.js --scrape-only",
     "analyze": "node scripts/run.js --analyze-only",

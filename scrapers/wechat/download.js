@@ -6,13 +6,6 @@ const os = require('os');
 
 const DOWNLOAD_DIR = path.join(os.homedir(), '.wechat-review', 'downloads');
 
-/**
- * 下载公众号后台的图文分析和用户分析 Excel
- *
- * @param {import('playwright').Page} page - 已登录的页面
- * @param {string} token - 登录 token
- * @returns {{ articlesPath: string, usersPath: string }}
- */
 async function downloadData(page, token) {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
@@ -22,140 +15,116 @@ async function downloadData(page, token) {
   return { articlesPath, usersPath };
 }
 
-/**
- * 下载图文分析数据（内容分析 → 图文分析）
- */
 async function downloadArticles(page, token) {
-  console.log('[download] 导航到图文分析页面...');
+  console.log('[download] Opening content analysis page...');
 
-  // 导航到内容分析 → 图文分析
-  const articlesUrl = `https://mp.weixin.qq.com/cgi-bin/misrepairpage?action=page&token=${token}&lang=zh_CN&pluginid=luopan&f=json&ajax=1&random=${Math.random()}`;
-
-  // 直接导航到图文分析页
   await page.goto(
-    `https://mp.weixin.qq.com/misc/pluginpage?action=index&id=luopan&token=${token}&lang=zh_CN`,
-    { waitUntil: 'networkidle' }
+    `https://mp.weixin.qq.com/misc/appmsganalysis?action=report&type=daily_v2&token=${token}&lang=zh_CN`,
+    { waitUntil: 'domcontentloaded' }
   );
+  await page.waitForTimeout(3000);
 
-  // 等待页面完全加载
-  await page.waitForTimeout(2000);
-
-  // 查找并点击"图文分析" tab（如果需要）
-  try {
-    const graphTab = await page.locator('text=图文分析').first();
-    if (await graphTab.isVisible()) {
-      await graphTab.click();
-      await page.waitForTimeout(1500);
-    }
-  } catch {
-    console.log('[download] 已在图文分析页面');
-  }
-
-  // 选择30天范围
   await selectDateRange(page, 30);
+  const articlesPath = await triggerDownload(page, 'articles', '内容分析');
 
-  // 点击导出按钮并等待下载
-  const articlesPath = await triggerDownload(page, 'articles');
-
-  console.log(`[download] 图文数据已下载: ${articlesPath}`);
+  console.log(`[download] Content analysis downloaded: ${articlesPath}`);
   return articlesPath;
 }
 
-/**
- * 下载用户分析数据
- */
 async function downloadUsers(page, token) {
-  console.log('[download] 导航到用户分析页面...');
+  console.log('[download] Opening user analysis page...');
 
   await page.goto(
-    `https://mp.weixin.qq.com/misc/pluginpage?action=index&id=finder_user&token=${token}&lang=zh_CN`,
-    { waitUntil: 'networkidle' }
+    `https://mp.weixin.qq.com/misc/useranalysis?token=${token}&lang=zh_CN`,
+    { waitUntil: 'domcontentloaded' }
   );
+  await page.waitForTimeout(3000);
 
-  await page.waitForTimeout(2000);
-
-  // 选择30天范围
   await selectDateRange(page, 30);
+  const usersPath = await triggerDownload(page, 'users', '用户分析');
 
-  // 导出
-  const usersPath = await triggerDownload(page, 'users');
-
-  console.log(`[download] 用户数据已下载: ${usersPath}`);
+  console.log(`[download] User analysis downloaded: ${usersPath}`);
   return usersPath;
 }
 
-/**
- * 选择日期范围
- */
 async function selectDateRange(page, days) {
-  try {
-    // 查找"最近30天"之类的选项
-    const rangeBtn = await page.locator(`text=最近${days}天`).first();
-    if (await rangeBtn.isVisible()) {
-      await rangeBtn.click();
-      await page.waitForTimeout(1000);
-      return;
-    }
-  } catch {
-    // 无预设按钮，手动设置日期范围
-  }
+  const labels = days === 30
+    ? ['最近 30 天', '最近30天']
+    : [`最近 ${days} 天`, `最近${days}天`];
 
-  // 尝试查找日期范围选择器
-  try {
-    const dateRange = await page.locator('.weui-desktop-picker__wrp, .date-range-picker, [class*="date"]').first();
-    if (await dateRange.isVisible()) {
-      await dateRange.click();
-      await page.waitForTimeout(500);
-
-      // 点击30天选项
-      const option30 = await page.locator('text=30天, text=30 天, text=最近30天').first();
-      if (await option30.isVisible()) {
-        await option30.click();
+  for (const label of labels) {
+    const locator = page.getByText(label, { exact: false }).first();
+    if (await locator.count()) {
+      try {
+        await locator.click({ timeout: 2000 });
         await page.waitForTimeout(1000);
+        console.log(`[download] Selected date range: ${label}`);
+        return true;
+      } catch {
+        // Ignore and try the next variant.
       }
     }
-  } catch {
-    console.log('[download] 无法设置日期范围，使用默认范围');
   }
+
+  console.log('[download] Date range was not changed automatically. You can select it manually in the page if needed.');
+  return false;
 }
 
-/**
- * 触发导出下载
- */
-async function triggerDownload(page, prefix) {
+async function triggerDownload(page, prefix, pageLabel) {
   const timestamp = Date.now();
   const filename = `${prefix}_${timestamp}.xls`;
   const savePath = path.join(DOWNLOAD_DIR, filename);
 
-  // 设置下载路径
   const client = await page.context().newCDPSession(page);
   await client.send('Browser.setDownloadBehavior', {
     behavior: 'allow',
     downloadPath: DOWNLOAD_DIR,
   });
 
-  // 查找并点击导出/下载按钮
-  const exportBtn = await page.locator(
-    'text=导出数据, text=导出, text=下载, button:has-text("导出"), a:has-text("导出")'
-  ).first();
-
-  if (await exportBtn.isVisible()) {
-    // 监听下载事件
+  const button = await findExportButton(page);
+  if (button) {
+    console.log(`[download] Found export button on ${pageLabel}, trying automatic export...`);
     const downloadPromise = page.waitForEvent('download', { timeout: 30_000 });
-    await exportBtn.click();
-
+    await button.click();
     const download = await downloadPromise;
     await download.saveAs(savePath);
-
     return savePath;
   }
 
-  throw new Error(`找不到导出按钮，无法下载 ${prefix} 数据`);
+  console.log(`[download] Could not find export button automatically on ${pageLabel}.`);
+  console.log(`[download] Please use the open browser to confirm the date range and click "导出" or "下载" manually for ${pageLabel}.`);
+  console.log('[download] Waiting for the browser download event...');
+
+  const manualDownload = await page.waitForEvent('download', { timeout: 180_000 });
+  await manualDownload.saveAs(savePath);
+  return savePath;
 }
 
-/**
- * 获取最新的缓存文件
- */
+async function findExportButton(page) {
+  const candidates = [
+    () => page.getByRole('button', { name: /导出数据|导出|下载/ }).first(),
+    () => page.getByRole('link', { name: /导出数据|导出|下载/ }).first(),
+    () => page.getByText('导出数据', { exact: false }).first(),
+    () => page.getByText('导出', { exact: false }).first(),
+    () => page.getByText('下载', { exact: false }).first(),
+  ];
+
+  for (const build of candidates) {
+    const locator = build();
+    if (await locator.count()) {
+      try {
+        if (await locator.isVisible()) {
+          return locator;
+        }
+      } catch {
+        // Ignore and keep searching.
+      }
+    }
+  }
+
+  return null;
+}
+
 function getLatestFiles() {
   if (!fs.existsSync(DOWNLOAD_DIR)) return null;
 
