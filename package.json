@@ -1,0 +1,19 @@
+{
+  "name": "wechat-review",
+  "version": "1.0.0",
+  "description": "公众号数据分析 Cola Skill — 抓取、解析、多专家分析",
+  "main": "scripts/run.js",
+  "scripts": {
+    "start": "node scripts/run.js",
+    "scrape": "node scripts/run.js --scrape-only",
+    "analyze": "node scripts/run.js --analyze-only",
+    "test-parser": "node scripts/test-parser.js"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0",
+    "xlsx": "^0.18.5",
+    "cheerio": "^1.0.0",
+    "chalk": "^4.1.2"
+  },
+  "license": "MIT"
+}

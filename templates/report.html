@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公众号数据分析报告</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #EEEEF4;
+      --surface: #FFFFFF;
+      --surface-hover: #F6F6FB;
+      --surface-alt: #F3F3FA;
+      --primary: #5046E5;
+      --primary-soft: rgba(80, 70, 229, 0.10);
+      --primary-medium: rgba(80, 70, 229, 0.16);
+      --purple: #8B5CF6;
+      --purple-soft: rgba(139, 92, 246, 0.10);
+      --green: #0D9668;
+      --green-soft: rgba(13, 150, 104, 0.10);
+      --red: #E03131;
+      --red-soft: rgba(224, 49, 49, 0.08);
+      --amber: #E8730C;
+      --amber-soft: rgba(232, 115, 12, 0.10);
+      --teal: #0C8599;
+      --teal-soft: rgba(12, 133, 153, 0.10);
+      --pink: #D6336C;
+      --pink-soft: rgba(214, 51, 108, 0.10);
+      --text: #111827;
+      --text-secondary: #4B5563;
+      --text-muted: #9CA3AF;
+      --border: #E5E7EB;
+      --border-light: #F3F4F6;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.03);
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    /* ═══════════════════════════════════════
+       HEADER — 白底 + 左侧强调条
+       ═══════════════════════════════════════ */
+    .report-header {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2rem 2.25rem;
+      margin-bottom: 1.25rem;
+      border-left: 4px solid var(--primary);
+    }
+    .header-eyebrow {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .report-header h1 {
+      font-size: 1.625rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+    }
+    .header-meta {
+      font-size: 0.9375rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .header-meta .dot {
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════
+       KPI GRID — 浮层卡片 + 大数字
+       ═══════════════════════════════════════ */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.375rem 1.5rem;
+      position: relative;
+      transition: box-shadow 0.2s;
+    }
+    .kpi-card:hover {
+      box-shadow: var(--shadow-lg);
+    }
+    .kpi-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.625rem;
+      letter-spacing: 0.02em;
+    }
+    .kpi-value {
+      font-size: 2.75rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.375rem;
+      color: var(--text);
+    }
+    .kpi-value.clr-primary { color: var(--primary); }
+    .kpi-value.clr-green { color: var(--green); }
+    .kpi-value.clr-red { color: var(--red); }
+    .kpi-value.clr-amber { color: var(--amber); }
+    .kpi-value.clr-purple { color: var(--purple); }
+    .kpi-footer {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .kpi-sub {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+    }
+    .kpi-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.15rem;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      padding: 0.125rem 0.5rem;
+      border-radius: 100px;
+    }
+    .kpi-trend.up { background: var(--green-soft); color: var(--green); }
+    .kpi-trend.down { background: var(--red-soft); color: var(--red); }
+
+    /* KPI top accent stripe */
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 1.25rem; right: 1.25rem;
+      height: 3px;
+      border-radius: 0 0 3px 3px;
+    }
+    .kpi-card.stripe-primary::before { background: linear-gradient(90deg, var(--primary), var(--purple)); }
+    .kpi-card.stripe-green::before { background: linear-gradient(90deg, var(--green), var(--teal)); }
+    .kpi-card.stripe-amber::before { background: linear-gradient(90deg, var(--amber), var(--pink)); }
+    .kpi-card.stripe-purple::before { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+    .kpi-card.stripe-red::before { background: linear-gradient(90deg, var(--red), var(--amber)); }
+    .kpi-card.stripe-teal::before { background: linear-gradient(90deg, var(--teal), var(--primary)); }
+
+    /* ═══════════════════════════════════════
+       SECTION TITLES
+       ═══════════════════════════════════════ */
+    .section {
+      margin-bottom: 1.5rem;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .section-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8125rem;
+      flex-shrink: 0;
+    }
+    .section-icon.icon-trend { background: var(--primary-soft); color: var(--primary); }
+    .section-icon.icon-rank { background: var(--purple-soft); color: var(--purple); }
+    .section-icon.icon-insight { background: var(--green-soft); color: var(--green); }
+    .section-icon.icon-risk { background: var(--red-soft); color: var(--red); }
+    .section-icon.icon-channel { background: var(--amber-soft); color: var(--amber); }
+    .section-icon.icon-check { background: var(--primary-soft); color: var(--primary); }
+    .section h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    /* ═══════════════════════════════════════
+       CHART CARDS
+       ═══════════════════════════════════════ */
+    .chart-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 0.875rem;
+    }
+    .chart-title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 1.125rem;
+    }
+    .chart-card canvas {
+      max-height: 280px;
+    }
+    .chart-row {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0.875rem;
+      margin-bottom: 0.875rem;
+    }
+
+    /* ═══════════════════════════════════════
+       ARTICLE TABLE
+       ═══════════════════════════════════════ */
+    .table-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .table-head-bar {
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .table-head-bar h3 {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .table-head-bar .count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: var(--surface-hover); }
+    th {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      padding: 0.625rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+    }
+    td {
+      font-size: 0.9375rem;
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-light);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface-hover); }
+    td.num, th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    td.num { font-weight: 600; }
+
+    .rank-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.625rem; height: 1.625rem;
+      border-radius: 8px;
+      font-size: 0.6875rem;
+      font-weight: 800;
+    }
+    .rank-1 { background: linear-gradient(135deg, #FBBF24, #F59E0B); color: #fff; }
+    .rank-2 { background: linear-gradient(135deg, #D1D5DB, #9CA3AF); color: #fff; }
+    .rank-3 { background: linear-gradient(135deg, #D2A679, #B8865C); color: #fff; }
+    .rank-default { background: var(--surface-alt); color: var(--text-muted); }
+
+    .title-cell { max-width: 380px; line-height: 1.45; }
+    .title-cell .pub-date {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      margin-top: 0.125rem;
+    }
+
+    /* ═══════════════════════════════════════
+       FINDINGS — 编号卡片 (01, 02, 03)
+       ═══════════════════════════════════════ */
+    .findings-section {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.75rem 2rem;
+      margin-bottom: 0.875rem;
+    }
+    .findings-group {
+      margin-bottom: 2rem;
+    }
+    .findings-group:last-child { margin-bottom: 0; }
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.125rem;
+    }
+    .group-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .group-dot.dot-green { background: var(--green); }
+    .group-dot.dot-primary { background: var(--primary); }
+    .group-dot.dot-amber { background: var(--amber); }
+    .group-label {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .group-divider {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .finding-item {
+      display: flex;
+      gap: 1rem;
+      padding: 0.75rem 0;
+      align-items: flex-start;
+    }
+    .finding-num {
+      width: 2rem; height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 0.125rem;
+    }
+    .finding-num.num-green { background: var(--green-soft); color: var(--green); }
+    .finding-num.num-primary { background: var(--primary-soft); color: var(--primary); }
+    .finding-num.num-amber { background: var(--amber-soft); color: var(--amber); }
+    .finding-text {
+      font-size: 0.9375rem;
+      color: var(--text);
+      line-height: 1.75;
+      flex: 1;
+    }
+
+    /* Highlight numbers in findings */
+    .finding-text strong, .finding-text b {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    /* Details toggle */
+    .details-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+      margin-top: 0.75rem;
+      padding: 0.25rem 0;
+      border: none;
+      background: none;
+      transition: opacity 0.2s;
+    }
+    .details-toggle:hover { opacity: 0.7; }
+    .details-toggle .arrow {
+      display: inline-block;
+      transition: transform 0.2s;
+      font-size: 0.625rem;
+    }
+    .details-toggle.open .arrow { transform: rotate(90deg); }
+    .details-block {
+      display: none;
+      background: var(--surface-alt);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      margin-top: 0.625rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.9;
+      white-space: pre-wrap;
+      border-left: 3px solid var(--border);
+    }
+    .details-block.show { display: block; }
+
+    /* ═══════════════════════════════════════
+       RISK ITEMS
+       ═══════════════════════════════════════ */
+    .risk-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .risk-item {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      padding: 0.875rem 1.25rem;
+      font-size: 0.9375rem;
+      color: var(--text);
+      line-height: 1.75;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      border-left: 3px solid var(--red);
+      background: linear-gradient(90deg, var(--red-soft) 0%, var(--surface) 40%);
+    }
+    .risk-source {
+      font-size: 0.625rem;
+      font-weight: 700;
+      color: var(--red);
+      background: var(--red-soft);
+      padding: 0.125rem 0.5rem;
+      border-radius: 100px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 0.25rem;
+    }
+
+    /* ═══════════════════════════════════════
+       CROSS-CHECK
+       ═══════════════════════════════════════ */
+    .cross-item {
+      background: var(--primary-soft);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.9375rem;
+      color: var(--text-secondary);
+      line-height: 1.75;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--primary);
+    }
+
+    /* ═══════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════ */
+    footer {
+      margin-top: 2.5rem;
+      text-align: center;
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      padding: 1.25rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .container { padding: 1.25rem 0.875rem 2rem; }
+      .report-header { padding: 1.5rem; }
+      .report-header h1 { font-size: 1.25rem; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 0.625rem; }
+      .kpi-value { font-size: 2rem; }
+      .chart-row { grid-template-columns: 1fr; }
+      .findings-section { padding: 1.25rem; }
+      .title-cell { max-width: 200px; }
+    }
+    @media (max-width: 480px) {
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+      .kpi-value { font-size: 1.5rem; }
+      .report-header h1 { font-size: 1rem; }
+    }
+
+    /* ═══════════════════════════════════════
+       PRINT
+       ═══════════════════════════════════════ */
+    @media print {
+      body { background: #fff; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .container { max-width: 100%; padding: 0; }
+      .section { page-break-inside: avoid; }
+      .chart-card, .findings-section, .table-card { box-shadow: none; border: 1px solid var(--border); }
+      .details-block { display: block !important; }
+      canvas { max-height: 200px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ── HEADER ── -->
+    <div class="report-header">
+      <div class="header-eyebrow">公众号数据分析报告</div>
+      <h1 id="reportTitle">公众号数据分析报告</h1>
+      <div class="header-meta">
+        <span id="reportDateRange"></span>
+        <span class="dot"></span>
+        <span id="reportAccount">六哥的AI启示</span>
+      </div>
+    </div>
+
+    <!-- ── KPI GRID ── -->
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- ── 阅读趋势 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-trend">📈</div>
+        <h2>阅读趋势</h2>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">每日阅读量与粉丝趋势</div>
+        <canvas id="chartReaderTrend"></canvas>
+      </div>
+    </div>
+
+    <!-- ── 渠道 + 互动 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-channel">📡</div>
+        <h2>渠道与互动</h2>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-title">阅读来源渠道分布</div>
+          <canvas id="chartChannelPie"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">每日分享与收藏</div>
+          <canvas id="chartInteraction"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 文章表现 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-rank">🏆</div>
+        <h2>文章表现排名</h2>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">文章阅读量排名</div>
+        <canvas id="chartArticleBar"></canvas>
+      </div>
+      <div class="table-card">
+        <div class="table-head-bar">
+          <h3>文章明细</h3>
+          <span class="count" id="articleCount"></span>
+        </div>
+        <div class="table-wrapper">
+          <table id="articleTable">
+            <thead>
+              <tr>
+                <th style="width:2.5rem">#</th>
+                <th>文章</th>
+                <th class="num">阅读</th>
+                <th class="num">占比</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 核心发现 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-insight">💡</div>
+        <h2>核心发现</h2>
+      </div>
+      <div class="findings-section" id="findingsContainer"></div>
+    </div>
+
+    <!-- ── 风险与建议 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-risk">⚠️</div>
+        <h2>风险与建议</h2>
+      </div>
+      <div class="risk-list" id="risksContainer"></div>
+    </div>
+
+    <!-- ── 用户增长趋势 ── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon icon-trend">👥</div>
+        <h2>用户增长趋势</h2>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">每日新增关注 vs 取消关注</div>
+        <canvas id="chartUserFlow"></canvas>
+      </div>
+    </div>
+
+    <!-- ── 交叉验证 ── -->
+    <div class="section" id="crossCheckSection" style="display:none;">
+      <div class="section-head">
+        <div class="section-icon icon-check">✓</div>
+        <h2>交叉验证</h2>
+      </div>
+      <div id="crossCheckContainer"></div>
+    </div>
+
+    <!-- ── FOOTER ── -->
+    <footer>
+      由 WeChat Review 生成 · <span id="generatedAt"></span>
+    </footer>
+
+  </div>
+
+  <script>
+    // ══════ DATA INJECTION ══════
+    const REPORT_DATA = /*__REPORT_JSON__*/null;
+
+    if (!REPORT_DATA) {
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:80vh;color:var(--text-muted);font-size:0.875rem;"><div style="text-align:center;"><p style="font-size:1.125rem;margin-bottom:0.5rem;color:var(--text-secondary);">暂无数据</p><p>请运行分析流程后重新生成报告</p></div></div>';
+    } else {
+      render(REPORT_DATA);
+    }
+
+    function render(report) {
+      const { sections, articleTable, charts, crossCheck } = report;
+
+      // ── Header ──
+      document.getElementById('reportTitle').textContent = cleanEmoji(sections.overview.title || '公众号数据分析报告');
+      const s = fmtDate(report.dateRange.start);
+      const e = fmtDate(report.dateRange.end);
+      document.getElementById('reportDateRange').textContent = `${s} — ${e}`;
+      document.getElementById('generatedAt').textContent = new Date(report.generatedAt).toLocaleString('zh-CN');
+
+      // ── KPI Grid ──
+      buildKPIs(sections.overview.kpis);
+
+      // ── Findings ──
+      buildFindings(sections);
+
+      // ── Risks ──
+      buildRisks(sections.risksAndOpportunities.risks);
+
+      // ── Cross-check ──
+      if (crossCheck && crossCheck.length > 0) {
+        document.getElementById('crossCheckSection').style.display = 'block';
+        const cc = document.getElementById('crossCheckContainer');
+        crossCheck.forEach(c => {
+          cc.innerHTML += `<div class="cross-item">${c.note}</div>`;
+        });
+      }
+
+      // ── Article Table ──
+      buildArticleTable(articleTable);
+
+      // ── Charts ──
+      renderCharts(charts);
+    }
+
+    /* ────────────────────────────────
+       KPI CARDS
+       ──────────────────────────────── */
+    function buildKPIs(kpis) {
+      const grid = document.getElementById('kpiGrid');
+      const stripes = ['stripe-primary', 'stripe-green', 'stripe-amber', 'stripe-purple', 'stripe-red', 'stripe-teal'];
+      const valueColors = ['clr-primary', 'clr-green', 'clr-amber', 'clr-purple', 'clr-red', ''];
+
+      kpis.forEach((kpi, i) => {
+        const stripe = stripes[i % stripes.length];
+        const vc = getValueColor(kpi, i, valueColors);
+        let trendHtml = '';
+        if (kpi.trendValue) {
+          const isUp = parseFloat(kpi.trendValue) >= 0;
+          trendHtml = `<span class="kpi-trend ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${kpi.trendValue}</span>`;
+        }
+
+        grid.innerHTML += `
+          <div class="kpi-card ${stripe}">
+            <div class="kpi-label">${kpi.label}</div>
+            <div class="kpi-value ${vc}">${typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}</div>
+            <div class="kpi-footer">
+              <span class="kpi-sub">${kpi.sub || ''}</span>
+              ${trendHtml}
+            </div>
+          </div>`;
+      });
+    }
+
+    function getValueColor(kpi, i, colors) {
+      if (kpi.trend === 'up') return 'clr-green';
+      if (kpi.trend === 'down' || kpi.trend === 'warning') return 'clr-red';
+      return colors[i % colors.length];
+    }
+
+    /* ────────────────────────────────
+       FINDINGS — numbered cards
+       ──────────────────────────────── */
+    function buildFindings(sections) {
+      const container = document.getElementById('findingsContainer');
+      const groups = [
+        { key: 'growth', section: sections.growth, label: '增长洞察', dot: 'dot-green', num: 'num-green' },
+        { key: 'content', section: sections.content, label: '内容洞察', dot: 'dot-primary', num: 'num-primary' },
+        { key: 'distribution', section: sections.distribution, label: '传播洞察', dot: 'dot-amber', num: 'num-amber' },
+      ];
+
+      groups.forEach(g => {
+        const title = cleanEmoji(g.section.title || g.label);
+        let html = `
+          <div class="findings-group">
+            <div class="group-header">
+              <span class="group-dot ${g.dot}"></span>
+              <span class="group-label">${title}</span>
+              <span class="group-divider"></span>
+            </div>`;
+
+        if (g.section.findings && g.section.findings.length > 0) {
+          g.section.findings.forEach((f, i) => {
+            const num = String(i + 1).padStart(2, '0');
+            html += `
+              <div class="finding-item">
+                <span class="finding-num ${g.num}">${num}</span>
+                <div class="finding-text">${highlightNumbers(f)}</div>
+              </div>`;
+          });
+        }
+
+        if (g.section.details) {
+          const detailId = `detail-${g.key}`;
+          html += `
+            <button class="details-toggle" onclick="toggleDetails('${detailId}', this)">
+              <span class="arrow">▶</span> 查看详细分析
+            </button>
+            <div class="details-block" id="${detailId}">${g.section.details}</div>`;
+        }
+
+        html += '</div>';
+        container.innerHTML += html;
+      });
+    }
+
+    function toggleDetails(id, btn) {
+      const el = document.getElementById(id);
+      el.classList.toggle('show');
+      btn.classList.toggle('open');
+      btn.querySelector('.arrow').textContent = el.classList.contains('show') ? '▶' : '▶';
+    }
+
+    /* ────────────────────────────────
+       RISKS
+       ──────────────────────────────── */
+    function buildRisks(risks) {
+      const container = document.getElementById('risksContainer');
+      if (!risks || risks.length === 0) {
+        container.innerHTML = '<div class="risk-item" style="border-left-color:var(--border);background:var(--surface);color:var(--text-muted);">暂无风险项</div>';
+        return;
+      }
+      risks.forEach(r => {
+        container.innerHTML += `
+          <div class="risk-item">
+            <span class="risk-source">${r.source}</span>
+            <span>${r.text}</span>
+          </div>`;
+      });
+    }
+
+    /* ────────────────────────────────
+       ARTICLE TABLE
+       ──────────────────────────────── */
+    function buildArticleTable(articleTable) {
+      const tbody = document.querySelector('#articleTable tbody');
+      document.getElementById('articleCount').textContent = `共 ${articleTable.length} 篇`;
+
+      articleTable.forEach(a => {
+        let rankCls = 'rank-default';
+        if (a.rank === 1) rankCls = 'rank-1';
+        else if (a.rank === 2) rankCls = 'rank-2';
+        else if (a.rank === 3) rankCls = 'rank-3';
+
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="rank-num ${rankCls}">${a.rank}</span></td>
+            <td class="title-cell">
+              <div>${a.title}</div>
+              <div class="pub-date">${a.pubDate}</div>
+            </td>
+            <td class="num">${a.readers.toLocaleString()}</td>
+            <td class="num">${a.readRatio}</td>
+          </tr>`;
+      });
+    }
+
+    /* ────────────────────────────────
+       CHARTS
+       ──────────────────────────────── */
+    function renderCharts(charts) {
+      Chart.defaults.color = '#9CA3AF';
+      Chart.defaults.borderColor = '#F3F4F6';
+      Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+      Chart.defaults.font.size = 11;
+
+      // Rich but tasteful palette — saturated, diverse, not AI-neon
+      const palette = ['#5046E5', '#D6336C', '#0D9668', '#E8730C', '#0C8599', '#8B5CF6', '#E03131'];
+
+      const scaleBase = {
+        grid: { color: '#F3F4F6', drawBorder: false },
+        ticks: { padding: 8, font: { size: 10 } },
+        border: { display: false },
+      };
+
+      const pluginBase = {
+        legend: {
+          labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, padding: 14, font: { size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: '#1F2937',
+          titleFont: { size: 11, weight: '600' },
+          bodyFont: { size: 11 },
+          padding: { top: 8, bottom: 8, left: 12, right: 12 },
+          cornerRadius: 8,
+          displayColors: true,
+          boxWidth: 8, boxHeight: 8, boxPadding: 4,
+        }
+      };
+
+      // ── Reader Trend (dual Y) ──
+      if (charts.readerTrend) {
+        const rt = charts.readerTrend;
+        new Chart(document.getElementById('chartReaderTrend'), {
+          type: 'line',
+          data: {
+            labels: rt.labels.map(d => d.slice(5)),
+            datasets: [
+              {
+                label: rt.datasets[0].label,
+                data: rt.datasets[0].data,
+                borderColor: palette[0],
+                backgroundColor: palette[0] + '18',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2.5,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: palette[0],
+                pointHoverBorderWidth: 2.5,
+                yAxisID: 'y1',
+              },
+              {
+                label: rt.datasets[1].label,
+                data: rt.datasets[1].data,
+                borderColor: '#9CA3AF',
+                borderDash: [5, 3],
+                borderWidth: 1.5,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                fill: false,
+                yAxisID: 'y2',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            interaction: { mode: 'index', intersect: false },
+            plugins: pluginBase,
+            scales: {
+              x: { ...scaleBase, grid: { display: false } },
+              y1: {
+                ...scaleBase,
+                position: 'left',
+                title: { display: true, text: '阅读人数', font: { size: 10 }, color: '#9CA3AF', padding: { bottom: 4 } },
+              },
+              y2: {
+                ...scaleBase,
+                position: 'right',
+                grid: { display: false },
+                title: { display: true, text: '累积粉丝', font: { size: 10 }, color: '#9CA3AF', padding: { bottom: 4 } },
+              },
+            },
+          },
+        });
+      }
+
+      // ── Channel Doughnut ──
+      if (charts.channelPie) {
+        const cp = charts.channelPie;
+        const total = cp.data.reduce((a, b) => a + b, 0);
+        new Chart(document.getElementById('chartChannelPie'), {
+          type: 'doughnut',
+          data: {
+            labels: cp.labels,
+            datasets: [{
+              data: cp.data,
+              backgroundColor: palette,
+              borderWidth: 2,
+              borderColor: '#ffffff',
+              hoverOffset: 6,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1.15,
+            cutout: '62%',
+            plugins: {
+              ...pluginBase,
+              legend: {
+                position: 'bottom',
+                labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, padding: 10, font: { size: 10 } },
+              },
+            },
+          },
+          plugins: [{
+            id: 'centerText',
+            afterDraw(chart) {
+              const { ctx, chartArea } = chart;
+              const cx = (chartArea.left + chartArea.right) / 2;
+              const cy = (chartArea.top + chartArea.bottom) / 2;
+              ctx.save();
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.font = "800 1.5rem -apple-system, BlinkMacSystemFont, sans-serif";
+              ctx.fillStyle = '#111827';
+              ctx.fillText(total.toLocaleString(), cx, cy - 6);
+              ctx.font = "500 0.625rem -apple-system, BlinkMacSystemFont, sans-serif";
+              ctx.fillStyle = '#9CA3AF';
+              ctx.fillText('总阅读', cx, cy + 14);
+              ctx.restore();
+            }
+          }],
+        });
+      }
+
+      // ── Interaction Trend ──
+      if (charts.interactionTrend) {
+        const it = charts.interactionTrend;
+        new Chart(document.getElementById('chartInteraction'), {
+          type: 'line',
+          data: {
+            labels: it.labels.map(d => d.slice(5)),
+            datasets: it.datasets.map((ds, i) => ({
+              label: ds.label,
+              data: ds.data,
+              borderColor: [palette[5], palette[3]][i] || palette[i],
+              backgroundColor: ([palette[5], palette[3]][i] || palette[i]) + '18',
+              borderWidth: 2,
+              tension: 0.35,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              fill: i === 0,
+            })),
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1.3,
+            plugins: pluginBase,
+            scales: {
+              x: { ...scaleBase, grid: { display: false } },
+              y: scaleBase,
+            },
+          },
+        });
+      }
+
+      // ── Article Bar (horizontal) ──
+      if (charts.articleBar) {
+        const ab = charts.articleBar;
+        const barColors = ab.data.map((_, i) =>
+          i === 0 ? palette[0] : i < 3 ? palette[0] + 'bb' : '#D1D5DB'
+        );
+        new Chart(document.getElementById('chartArticleBar'), {
+          type: 'bar',
+          data: {
+            labels: ab.labels,
+            datasets: [{
+              label: '阅读人数',
+              data: ab.data,
+              backgroundColor: barColors,
+              borderRadius: 4,
+              borderSkipped: false,
+              barPercentage: 0.6,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.2,
+            indexAxis: 'y',
+            plugins: {
+              ...pluginBase,
+              legend: { display: false },
+            },
+            scales: {
+              x: scaleBase,
+              y: {
+                ...scaleBase,
+                grid: { display: false },
+                ticks: { ...scaleBase.ticks, font: { size: 10 } },
+              },
+            },
+          },
+        });
+      }
+
+      // ── User Flow (stacked bar) ──
+      if (charts.userFlow) {
+        const uf = charts.userFlow;
+        new Chart(document.getElementById('chartUserFlow'), {
+          type: 'bar',
+          data: {
+            labels: uf.labels.map(d => d.slice(5)),
+            datasets: [
+              {
+                label: uf.datasets[0].label,
+                data: uf.datasets[0].data,
+                backgroundColor: palette[2] + 'cc',
+                borderRadius: { topLeft: 4, topRight: 4 },
+                borderSkipped: false,
+                barPercentage: 0.5,
+              },
+              {
+                label: uf.datasets[1].label,
+                data: uf.datasets[1].data,
+                backgroundColor: palette[4] + 'cc',
+                borderRadius: { bottomLeft: 4, bottomRight: 4 },
+                borderSkipped: false,
+                barPercentage: 0.5,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.8,
+            plugins: pluginBase,
+            scales: {
+              x: { ...scaleBase, stacked: true, grid: { display: false } },
+              y: { ...scaleBase, stacked: true },
+            },
+          },
+        });
+      }
+    }
+
+    /* ────────────────────────────────
+       UTILS
+       ──────────────────────────────── */
+    function cleanEmoji(str) {
+      return str.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u, '');
+    }
+
+    function fmtDate(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function highlightNumbers(text) {
+      // Bold numbers with % or Chinese units, and numbers in 「」
+      return text
+        .replace(/(\d+\.?\d*%)/g, '<strong>$1</strong>')
+        .replace(/([\d,]+(?:\.\d+)?)\s*(次|人|篇|天|倍)/g, '<strong>$1</strong>$2');
+    }
+  </script>
+</body>
+</html>
