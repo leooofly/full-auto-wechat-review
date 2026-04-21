@@ -1,0 +1,64 @@
+{
+  "expertResults": [
+    {
+      "role": "增长分析师",
+      "findings": [
+        "用具体数字写 3 到 5 条增长发现"
+      ],
+      "details": "写完整的增长分析，说明增长驱动、波峰波谷、流失和建议。",
+      "risks": [
+        "写 1 到 3 条增长风险或建议"
+      ],
+      "charts": [
+        {
+          "type": "line",
+          "title": "建议图表标题",
+          "fields": [
+            "date",
+            "newUser"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "内容策略师",
+      "findings": [
+        "用具体数字写 3 到 5 条内容发现"
+      ],
+      "details": "写完整的内容分析，说明选题、标题、内容表现和节奏。",
+      "risks": [
+        "写 1 到 3 条内容风险或建议"
+      ],
+      "charts": [
+        {
+          "type": "bar",
+          "title": "建议图表标题",
+          "fields": [
+            "title",
+            "readers"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "分发分析师",
+      "findings": [
+        "用具体数字写 3 到 5 条分发发现"
+      ],
+      "details": "写完整的分发分析，说明渠道贡献、分享扩散和传播路径。",
+      "risks": [
+        "写 1 到 3 条分发风险或建议"
+      ],
+      "charts": [
+        {
+          "type": "pie",
+          "title": "建议图表标题",
+          "fields": [
+            "channel",
+            "readers"
+          ]
+        }
+      ]
+    }
+  ]
+}

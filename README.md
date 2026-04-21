@@ -1,136 +1,161 @@
-# WeChat Review
+# wechat-review
 
-一个支持 `微信公众号` 和 `小红书` 的数据分析 skill。
+A reporting skill project for:
+- WeChat Official Accounts
+- Xiaohongshu creator accounts
 
-它延续这个项目原本的人机协作思路：
+It supports:
+- browser-assisted export
+- parsing backend files
+- data cleaning and validation
+- fixed 3-expert methodology
+- draft and final HTML report generation
 
-- 能自动的步骤尽量自动完成
-- 平台后台 UI 变化时，允许人工点一次导出继续流程
-- 把脆弱环节留给人确认，把稳定环节交给脚本处理
+## Important Product Boundary
 
-## 当前支持
+This project is meant to run inside host Agents such as Codex, Claude Code, and OpenClaw.
 
-### 微信公众号
+Use this split:
 
-- 登录微信公众号后台
-- 抓取内容分析与用户分析导出
-- 解析 `articles_*.xls/.xlsx` 与 `users_*.xls/.xlsx`
-- 生成结构化数据、专家 Prompt 和 HTML 报告
+- Local scripts:
+  - export
+  - parse
+  - clean
+  - generate `expertPrompts_*`
+  - generate `report_draft_*`
+- Host Agent:
+  - execute the 3 built-in expert prompts with the host model
+  - write `expertResults_*`
+  - run `scripts/generate_final.js`
 
-### 小红书 v1
+Do not require end users to configure a second model API for this skill.
 
-- 登录小红书创作者后台
-- 抓取或接入五类导出：`overview-watch_*`、`overview-interaction_*`、`overview-growth_*`、`overview-publish_*`、`notes_*`
-- 解析账号概览四个 tab 与内容分析笔记明细
-- 复用原有增长 / 内容 / 分发三视角分析与报告输出
+## Fixed Methodology
 
-## 安装
+Always keep these 3 roles:
+
+1. `增长分析师`
+2. `内容策略师`
+3. `分发分析师`
+
+The prompt definitions live in:
+- `analysis/casting.js`
+- `analysis/analyze.js`
+
+## Install
 
 ```bash
 npm install
 ```
 
-## 常用命令
+## Common Commands
 
-微信公众号完整流程：
-
-```bash
-node scripts/run.js
-```
-
-微信公众号仅抓取：
+Prepare WeChat data:
 
 ```bash
-node scripts/run.js --scrape-only
+node scripts/run.js --platform wechat
 ```
 
-微信公众号仅分析缓存：
+Prepare WeChat data for an exact range:
 
 ```bash
-node scripts/run.js --analyze-only
+node scripts/run.js --platform wechat --date-from 2026-04-13 --date-to 2026-04-19
 ```
 
-小红书完整流程：
+Prepare Xiaohongshu data:
 
 ```bash
 node scripts/run.js --platform xiaohongshu
 ```
 
-小红书仅抓取：
+Analyze cache only:
 
 ```bash
-node scripts/run.js --platform xiaohongshu --scrape-only
-```
-
-小红书仅分析缓存：
-
-```bash
+node scripts/run.js --platform wechat --analyze-only
 node scripts/run.js --platform xiaohongshu --analyze-only
 ```
 
-运行测试：
+Validate expert results:
+
+```bash
+node scripts/validate_expert_results.js --file C:\path\to\expertResults.json
+```
+
+Generate final report:
+
+```bash
+node scripts/generate_final.js --platform wechat --clean-data C:\path\to\cleanData.json --expert-results C:\path\to\expertResults.json
+```
+
+Run tests:
 
 ```bash
 npm test
 ```
 
-## 目录约定
+## Agent Host Workflow
 
-微信公众号：
+This is the correct end-to-end workflow:
 
-- Session: `~/.wechat-review/session.json`
-- 下载缓存: `~/.wechat-review/downloads/`
-- 报告输出: `~/.wechat-review/reports/`
+1. Run `node scripts/run.js ...`
+2. Get:
+   - `cleanData_*`
+   - `qualityReport_*`
+   - `expertPrompts_*`
+   - `report_draft_*`
+3. Read the newest `expertPrompts_*.json`
+4. Execute all 3 expert prompts with the host Agent model
+5. Save one `expertResults_*.json`
+6. Validate it with `scripts/validate_expert_results.js`
+7. Run `scripts/generate_final.js`
+8. Deliver `report_final.html` and `report_final.json`
 
-小红书：
-
-- Session: `~/.xiaohongshu-review/session.json`
-- 下载缓存: `~/.xiaohongshu-review/downloads/`
-- 报告输出: `~/.xiaohongshu-review/reports/`
-
-## 小红书导出文件约定
-
-小红书 v1 默认识别以下前缀的最近文件：
-
-- `overview-watch_*.xls/.xlsx/.csv/.html`
-- `overview-interaction_*.xls/.xlsx/.csv/.html`
-- `overview-growth_*.xls/.xlsx/.csv/.html`
-- `overview-publish_*.xls/.xlsx/.csv/.html`
-- `notes_*.xls/.xlsx/.csv/.html`
-
-其中：
-
-- `overview-watch_*` 用于观看数据
-- `overview-interaction_*` 用于互动数据
-- `overview-growth_*` 用于涨粉数据
-- `overview-publish_*` 用于发布数据
-- `notes_*` 用于笔记明细
-
-如果自动下载因后台结构变化失败，可以手动导出这五类文件放到缓存目录，再运行 `--analyze-only`。
-
-## 输出产物
+## Output Files
 
 - `cleanData_*.json`
 - `qualityReport_*.json`
 - `expertPrompts_*.json`
-- `report_*.html`
-- `report_*.json`
+- `expertResults_*.json`
+- `report_draft_*.html`
+- `report_draft_*.json`
 - `report_final.html`
+- `report_final.json`
 
-## 工作方式说明
+`report_draft_*` is not the final report.
+If `核心发现` and `风险与建议` are still empty, the host Agent has not finished the skill workflow.
 
-这个项目不追求“纯无人值守”。
+## Validation Rules For expertResults
 
-原因很简单：微信后台和小红书后台都可能调整页面结构、按钮文案和导出入口。相比脆弱的全自动化，“登录和导出允许人工确认一次，后续分析自动完成”的流程更稳，也更适合真实运营场景。
+The final step will reject invalid expert results.
+The `expertResults` file must satisfy all of these:
 
-## 发布说明
+- exactly 3 expert entries
+- includes growth, content, and distribution roles
+- each expert has at least 1 finding
+- each expert has non-empty `details`
+- the whole file contains at least 1 risk item
 
-- `node_modules/` 已排除，不建议提交
-- `reports/*.html` 和 `reports/*.json` 为分析产物，不建议公开提交
-- `scripts/test-parser.js` 现在使用临时合成 fixture，不再依赖本机缓存
+Use:
+- `templates/expert-results.template.json`
 
-## 免责声明
+as the shape reference.
 
-该项目依赖平台后台当前页面结构与导出能力。
+## Storage
 
-如果未来平台调整后台入口、按钮文案或导出机制，自动化部分可能需要小幅维护。当前实现已经尽量把高风险步骤设计成“可人工接管”的协作流程，以降低失效概率。
+WeChat:
+- session: `~/.wechat-review/session.json`
+- downloads: `~/.wechat-review/downloads/`
+- reports: `~/.wechat-review/reports/`
+
+Xiaohongshu:
+- session: `~/.xiaohongshu-review/session.json`
+- downloads: `~/.xiaohongshu-review/downloads/`
+- reports: `~/.xiaohongshu-review/reports/`
+
+## Collaboration Principle
+
+This project does not chase brittle full-unmanned automation.
+
+Use automation where it is stable.
+Allow one manual assist only when a platform UI change blocks export.
+Never disguise an incomplete draft as a finished final report.

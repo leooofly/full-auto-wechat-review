@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 
 const { synthesize } = require('../analysis/synthesize.js');
+const { validateExpertResultsDocument } = require('../analysis/expert-results.js');
 
 const HOME_DIR = os.homedir();
 const args = process.argv.slice(2);
@@ -71,14 +72,15 @@ function loadJson(filePath, label) {
 
 function loadExpertResults(filePath) {
   const parsed = loadJson(filePath, 'expertResults file');
-  if (Array.isArray(parsed)) {
-    return parsed;
-  }
-  if (parsed && Array.isArray(parsed.expertResults)) {
-    return parsed.expertResults;
+  const validation = validateExpertResultsDocument(parsed);
+
+  if (!validation.isValid) {
+    throw new Error(
+      `Invalid expert results in ${filePath}:\n- ${validation.errors.join('\n- ')}`
+    );
   }
 
-  throw new Error(`Unsupported expert results format: ${filePath}`);
+  return validation.expertResults;
 }
 
 function readArgValue(argv, flag) {
