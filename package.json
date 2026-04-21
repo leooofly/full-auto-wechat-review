@@ -10,7 +10,8 @@
     "analyze": "node scripts/run.js --analyze-only",
     "test-parser": "node scripts/test-parser.js",
     "test-expert-results": "node scripts/test-expert-results.js",
-    "validate-expert-results": "node scripts/validate_expert_results.js"
+    "validate-expert-results": "node scripts/validate_expert_results.js",
+    "build-release-packages": "node scripts/build_release_packages.js"
   },
   "dependencies": {
     "playwright": "^1.52.0",

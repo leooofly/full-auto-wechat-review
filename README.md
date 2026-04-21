@@ -1,5 +1,8 @@
 # wechat-review
 
+This repository is the shared source codebase for two separate skills.
+It is not the single end-user skill package to install directly.
+
 A reporting skill project for:
 - WeChat Official Accounts
 - Xiaohongshu creator accounts
@@ -10,6 +13,25 @@ It supports:
 - data cleaning and validation
 - fixed 3-expert methodology
 - draft and final HTML report generation
+
+## Release Strategy
+
+This repository now maintains:
+- one shared source codebase
+- two separate distributable skill packages
+
+Build them with:
+
+```bash
+npm run build-release-packages
+```
+
+Generated package folders:
+- `release/wechat-review-skill`
+- `release/xiaohongshu-review-skill`
+
+These are the packages you should zip and upload separately.
+End users should install one or both of those generated packages, not this mixed source repository as a single skill.
 
 ## Important Product Boundary
 

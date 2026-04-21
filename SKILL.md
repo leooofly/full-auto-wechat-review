@@ -1,8 +1,23 @@
 # WeChat Review Skill
 
+This file documents the shared source repository, not the final end-user installation package.
+The actual installable outputs are two separate generated skills:
+- `release/wechat-review-skill`
+- `release/xiaohongshu-review-skill`
+
 This skill prepares and finalizes operation reports for:
 - WeChat Official Accounts
 - Xiaohongshu creator accounts
+
+This repository now acts as the shared source for two separate release packages:
+- `release/wechat-review-skill`
+- `release/xiaohongshu-review-skill`
+
+Build them with:
+
+```bash
+npm run build-release-packages
+```
 
 This is a skill for host Agents such as Codex, Claude Code, and OpenClaw.
 It is not just a local Node script tool.

@@ -1,4 +1,7 @@
 node_modules/
+release/
+*-skill-release-*.zip
+*-review-skill.zip
 
 reports/*.html
 reports/*.json
